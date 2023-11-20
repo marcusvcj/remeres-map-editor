@@ -87,6 +87,7 @@ MainMenuBar::MainMenuBar(MainFrame* frame) :
 	MAKE_ACTION(SEARCH_ON_SELECTION_ITEM, wxITEM_NORMAL, OnSearchForItemOnSelection);
 	MAKE_ACTION(REPLACE_ON_SELECTION_ITEMS, wxITEM_NORMAL, OnReplaceItemsOnSelection);
 	MAKE_ACTION(REMOVE_ON_SELECTION_ITEM, wxITEM_NORMAL, OnRemoveItemOnSelection);
+	MAKE_ACTION(REMOVE_ON_SELECTION_MONSTER, wxITEM_NORMAL, OnRemoveMonstersOnSelection);
 	MAKE_ACTION(SELECT_MODE_COMPENSATE, wxITEM_RADIO, OnSelectionTypeChange);
 	MAKE_ACTION(SELECT_MODE_LOWER, wxITEM_RADIO, OnSelectionTypeChange);
 	MAKE_ACTION(SELECT_MODE_CURRENT, wxITEM_RADIO, OnSelectionTypeChange);
@@ -175,6 +176,7 @@ MainMenuBar::MainMenuBar(MainFrame* frame) :
 	MAKE_ACTION(SELECT_NPC, wxITEM_NORMAL, OnSelectNpcPalette);
 	MAKE_ACTION(SELECT_HOUSE, wxITEM_NORMAL, OnSelectHousePalette);
 	MAKE_ACTION(SELECT_WAYPOINT, wxITEM_NORMAL, OnSelectWaypointPalette);
+	MAKE_ACTION(SELECT_ZONES, wxITEM_NORMAL, OnSelectZonesPalette);
 	MAKE_ACTION(SELECT_RAW, wxITEM_NORMAL, OnSelectRawPalette);
 
 	MAKE_ACTION(FLOOR_0, wxITEM_RADIO, OnChangeFloor);
@@ -198,6 +200,11 @@ MainMenuBar::MainMenuBar(MainFrame* frame) :
 	MAKE_ACTION(EXTENSIONS, wxITEM_NORMAL, OnListExtensions);
 	MAKE_ACTION(GOTO_WEBSITE, wxITEM_NORMAL, OnGotoWebsite);
 	MAKE_ACTION(ABOUT, wxITEM_NORMAL, OnAbout);
+
+	MAKE_ACTION(SEARCH_ON_MAP_DUPLICATE, wxITEM_NORMAL, OnSearchForDuplicateItemsOnMap);
+	MAKE_ACTION(SEARCH_ON_SELECTION_DUPLICATE, wxITEM_NORMAL, OnSearchForDuplicateItemsOnSelection);
+	MAKE_ACTION(REMOVE_ON_MAP_DUPLICATE_ITEMS, wxITEM_NORMAL, OnRemoveForDuplicateItemsOnMap);
+	MAKE_ACTION(REMOVE_ON_SELECTION_DUPLICATE_ITEMS, wxITEM_NORMAL, OnRemoveForDuplicateItemsOnSelection);
 
 	// A deleter, this way the frame does not need
 	// to bother deleting us.
@@ -348,6 +355,7 @@ void MainMenuBar::Update() {
 	EnableItem(SEARCH_ON_SELECTION_ITEM, has_selection && is_host);
 	EnableItem(REPLACE_ON_SELECTION_ITEMS, has_selection && is_host);
 	EnableItem(REMOVE_ON_SELECTION_ITEM, has_selection && is_host);
+	EnableItem(REMOVE_ON_SELECTION_MONSTER, has_selection && is_host);
 
 	EnableItem(CUT, has_map);
 	EnableItem(COPY, has_map);
@@ -397,6 +405,7 @@ void MainMenuBar::Update() {
 	EnableItem(SELECT_MONSTER, loaded);
 	EnableItem(SELECT_NPC, loaded);
 	EnableItem(SELECT_WAYPOINT, loaded);
+	EnableItem(SELECT_ZONES, loaded);
 	EnableItem(SELECT_RAW, loaded);
 
 	EnableItem(LIVE_START, is_local);
@@ -404,6 +413,11 @@ void MainMenuBar::Update() {
 	EnableItem(LIVE_CLOSE, is_live);
 
 	EnableItem(DEBUG_VIEW_DAT, loaded);
+
+	EnableItem(SEARCH_ON_MAP_DUPLICATE, is_host);
+	EnableItem(SEARCH_ON_SELECTION_DUPLICATE, has_selection && is_host);
+	EnableItem(REMOVE_ON_MAP_DUPLICATE_ITEMS, is_local);
+	EnableItem(REMOVE_ON_SELECTION_DUPLICATE_ITEMS, is_local && has_selection);
 
 	UpdateFloorMenu();
 	UpdateIndicatorsMenu();
@@ -554,7 +568,7 @@ bool MainMenuBar::Load(const FileName &path, wxArrayString &warnings, wxString &
 	}
 
 #ifdef __LINUX__
-	const int count = 42;
+	const int count = 43;
 	wxAcceleratorEntry entries[count];
 	// Edit
 	entries[0].Set(wxACCEL_CTRL, (int)'Z', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::UNDO));
@@ -604,7 +618,8 @@ bool MainMenuBar::Load(const FileName &path, wxArrayString &warnings, wxString &
 	entries[38].Set(wxACCEL_NORMAL, (int)'C', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::SELECT_MONSTER));
 	entries[39].Set(wxACCEL_NORMAL, (int)'N', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::SELECT_NPC));
 	entries[40].Set(wxACCEL_NORMAL, (int)'W', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::SELECT_WAYPOINT));
-	entries[41].Set(wxACCEL_NORMAL, (int)'R', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::SELECT_RAW));
+	entries[41].Set(wxACCEL_NORMAL, (int)'Z', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::SELECT_ZONES));
+	entries[42].Set(wxACCEL_NORMAL, (int)'R', static_cast<int>(MAIN_FRAME_MENU) + static_cast<int>(MenuBar::SELECT_RAW));
 
 	wxAcceleratorTable accelerator(count, entries);
 	frame->SetAcceleratorTable(accelerator);
@@ -1117,6 +1132,23 @@ void MainMenuBar::OnRemoveItemOnSelection(wxCommandEvent &WXUNUSED(event)) {
 		g_gui.RefreshView();
 	}
 	dialog.Destroy();
+}
+
+void MainMenuBar::OnRemoveMonstersOnSelection(wxCommandEvent &WXUNUSED(event)) {
+	if (!g_gui.IsEditorOpen()) {
+		return;
+	}
+
+	g_gui.GetCurrentEditor()->clearActions();
+	g_gui.CreateLoadBar("Searching monsters on selection to remove...");
+	int64_t count = RemoveMonstersOnMap(g_gui.GetCurrentMap(), true);
+	g_gui.DestroyLoadBar();
+
+	wxString msg;
+	msg << count << " monsters removed.";
+	g_gui.PopupDialog("Remove Monsters", msg, wxOK);
+	g_gui.GetCurrentMap().doChange();
+	g_gui.RefreshView();
 }
 
 void MainMenuBar::OnSelectionTypeChange(wxCommandEvent &WXUNUSED(event)) {
@@ -1931,13 +1963,13 @@ void MainMenuBar::OnToggleFullscreen(wxCommandEvent &WXUNUSED(event)) {
 }
 
 void MainMenuBar::OnTakeScreenshot(wxCommandEvent &WXUNUSED(event)) {
-	wxString path = wxstr(g_settings.getString(Config::SCREENSHOT_DIRECTORY));
-	if (path.size() > 0 && (path.Last() == '/' || path.Last() == '\\')) {
+	auto path = g_settings.getString(Config::SCREENSHOT_DIRECTORY);
+	if (path.size() > 0 && (path.back() == '/' || path.back() == '\\')) {
 		path = path + "/";
 	}
 
 	g_gui.GetCurrentMapTab()->GetView()->GetCanvas()->TakeScreenshot(
-		path, wxstr(g_settings.getString(Config::SCREENSHOT_FORMAT))
+		wxstr(path), wxstr(g_settings.getString(Config::SCREENSHOT_FORMAT))
 	);
 }
 
@@ -2046,6 +2078,10 @@ void MainMenuBar::OnSelectNpcPalette(wxCommandEvent &WXUNUSED(event)) {
 
 void MainMenuBar::OnSelectWaypointPalette(wxCommandEvent &WXUNUSED(event)) {
 	g_gui.SelectPalettePage(TILESET_WAYPOINT);
+}
+
+void MainMenuBar::OnSelectZonesPalette(wxCommandEvent &WXUNUSED(event)) {
+	g_gui.SelectPalettePage(TILESET_ZONES);
 }
 
 void MainMenuBar::OnSelectRawPalette(wxCommandEvent &WXUNUSED(event)) {
@@ -2239,5 +2275,160 @@ void MainMenuBar::SearchItems(bool unique, bool action, bool container, bool wri
 	result->Clear();
 	for (std::vector<std::pair<Tile*, Item*>>::iterator iter = found.begin(); iter != found.end(); ++iter) {
 		result->AddPosition(searcher.desc(iter->second), iter->first->getPosition());
+	}
+}
+
+void MainMenuBar::OnSearchForDuplicateItemsOnMap(wxCommandEvent &WXUNUSED(event)) {
+	SearchDuplicatedItems(false);
+}
+
+void MainMenuBar::OnSearchForDuplicateItemsOnSelection(wxCommandEvent &WXUNUSED(event)) {
+	SearchDuplicatedItems(true);
+}
+
+void MainMenuBar::OnRemoveForDuplicateItemsOnMap(wxCommandEvent &WXUNUSED(event)) {
+	RemoveDuplicatesItems(false);
+}
+
+void MainMenuBar::OnRemoveForDuplicateItemsOnSelection(wxCommandEvent &WXUNUSED(event)) {
+	RemoveDuplicatesItems(true);
+}
+
+namespace SearchDuplicatedItems {
+	struct condition {
+		std::unordered_set<Tile*> foundTiles;
+
+		void operator()(Map& map, Tile* tile, Item* item, long long done) {
+			if (done % 0x8000 == 0) {
+				g_gui.SetLoadDone((unsigned int)(100 * done / map.getTileCount()));
+			}
+
+			if (!tile) {
+				return;
+			}
+
+			if (!item) {
+				return;
+			}
+
+			if (item->isGroundTile()) {
+				return;
+			}
+
+			if (foundTiles.count(tile) == 0) {
+				std::unordered_set<int> itemIDs;
+				for (Item* existingItem : tile->items) {
+					if (itemIDs.count(existingItem->getID()) > 0) {
+						foundTiles.insert(tile);
+						break;
+					}
+					itemIDs.insert(existingItem->getID());
+				}
+			}
+		}
+	};
+}
+
+void MainMenuBar::SearchDuplicatedItems(bool onSelection/* = false*/) {
+	if (!g_gui.IsEditorOpen()) {
+		return;
+	}
+
+	if (onSelection) {
+		g_gui.CreateLoadBar("Searching on selected area...");
+	} else {
+		g_gui.CreateLoadBar("Searching on map...");
+	}
+
+	SearchDuplicatedItems::condition finder;
+
+	foreach_ItemOnMap(g_gui.GetCurrentMap(), finder, onSelection);
+	std::unordered_set<Tile*>& foundTiles = finder.foundTiles;
+
+	g_gui.DestroyLoadBar();
+
+	size_t setSize = foundTiles.size();
+
+	wxString msg;
+	msg << setSize << " duplicate items founded.";
+
+	g_gui.PopupDialog("Search completed", msg, wxOK);
+
+	SearchResultWindow* result = g_gui.ShowSearchWindow();
+	result->Clear();
+	for (const Tile* tile : foundTiles) {
+		result->AddPosition("Duplicate items", tile->getPosition());
+	}
+}
+
+namespace RemoveDuplicatesItems {
+	struct condition {
+		bool operator()(Map& map, Tile* tile, Item* item, long long removed, long long done) {
+			if (done % 0x8000 == 0) {
+				g_gui.SetLoadDone((unsigned int)(100 * done / map.getTileCount()));
+			}
+
+			if (!tile) {
+				return false;
+			}
+
+			if (!item) {
+				return false;
+			}
+
+			if (item->isGroundTile()) {
+				return false;
+			}
+
+			if (item->isMoveable() && item->hasElevation()) {
+				return false;
+			}
+
+			std::unordered_set<int> itemIDsDuplicates;
+			for (Item* itemInTile : tile->items) {
+				if (itemInTile && itemInTile->getID() == item->getID()) {
+					if (itemIDsDuplicates.count(itemInTile->getID()) > 0) {
+						itemIDsDuplicates.clear();
+						return true;
+					}
+					itemIDsDuplicates.insert(itemInTile->getID());
+				}
+			}
+
+			itemIDsDuplicates.clear();
+			return false;
+		}
+	};
+}
+
+void MainMenuBar::RemoveDuplicatesItems(bool onSelection/* = false*/) {
+	if (!g_gui.IsEditorOpen()) {
+		return;
+	}
+
+	int ok = g_gui.PopupDialog("Remove Duplicate Items", "Do you want to remove all duplicates items from the map?", wxYES | wxNO);
+
+	if(ok == wxID_YES) {
+		g_gui.GetCurrentEditor()->getSelection().clear();
+		g_gui.GetCurrentEditor()->clearActions();
+
+		RemoveDuplicatesItems::condition func;
+
+		if (onSelection) {
+			g_gui.CreateLoadBar("Searching on selected area for items to remove...");
+		} else {
+			g_gui.CreateLoadBar("Searching on map for items to remove...");
+		}
+
+		long long removed = RemoveItemDuplicateOnMap(g_gui.GetCurrentMap(), func, onSelection);
+
+		g_gui.DestroyLoadBar();
+
+		wxString msg;
+		msg << removed << " duplicate items deleted.";
+
+		g_gui.PopupDialog("Search completed", msg, wxOK);
+
+		g_gui.GetCurrentMap().doChange();
 	}
 }

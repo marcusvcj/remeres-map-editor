@@ -56,6 +56,7 @@ namespace MenuBar {
 		SEARCH_ON_SELECTION_ITEM,
 		REPLACE_ON_SELECTION_ITEMS,
 		REMOVE_ON_SELECTION_ITEM,
+		REMOVE_ON_SELECTION_MONSTER,
 		SELECT_MODE_COMPENSATE,
 		SELECT_MODE_CURRENT,
 		SELECT_MODE_LOWER,
@@ -134,6 +135,7 @@ namespace MenuBar {
 		SELECT_NPC,
 		SELECT_HOUSE,
 		SELECT_WAYPOINT,
+		SELECT_ZONES,
 		SELECT_RAW,
 		FLOOR_0,
 		FLOOR_1,
@@ -155,6 +157,10 @@ namespace MenuBar {
 		EXTENSIONS,
 		GOTO_WEBSITE,
 		ABOUT,
+		SEARCH_ON_MAP_DUPLICATE,
+		SEARCH_ON_SELECTION_DUPLICATE,
+		REMOVE_ON_MAP_DUPLICATE_ITEMS,
+		REMOVE_ON_SELECTION_DUPLICATE_ITEMS,
 	};
 }
 
@@ -244,6 +250,7 @@ public:
 	void OnSearchForItemOnSelection(wxCommandEvent &event);
 	void OnReplaceItemsOnSelection(wxCommandEvent &event);
 	void OnRemoveItemOnSelection(wxCommandEvent &event);
+	void OnRemoveMonstersOnSelection(wxCommandEvent &event);
 
 	// Map menu
 	void OnMapEditTowns(wxCommandEvent &event);
@@ -280,6 +287,7 @@ public:
 	void OnSelectMonsterPalette(wxCommandEvent &event);
 	void OnSelectNpcPalette(wxCommandEvent &event);
 	void OnSelectWaypointPalette(wxCommandEvent &event);
+	void OnSelectZonesPalette(wxCommandEvent &event);
 	void OnSelectRawPalette(wxCommandEvent &event);
 
 	// Floor menu
@@ -290,6 +298,10 @@ public:
 	void OnListExtensions(wxCommandEvent &event);
 	void OnGotoWebsite(wxCommandEvent &event);
 	void OnAbout(wxCommandEvent &event);
+	void OnSearchForDuplicateItemsOnMap(wxCommandEvent &event);
+	void OnSearchForDuplicateItemsOnSelection(wxCommandEvent &event);
+	void OnRemoveForDuplicateItemsOnMap(wxCommandEvent &event);
+	void OnRemoveForDuplicateItemsOnSelection(wxCommandEvent &event);
 
 protected:
 	// Load and returns a menu item, also sets accelerator
@@ -297,7 +309,8 @@ protected:
 	// Checks the items in the menus according to the settings (in config)
 	void LoadValues();
 	void SearchItems(bool unique, bool action, bool container, bool writable, bool onSelection = false);
-
+	void SearchDuplicatedItems(bool onSelection = false);
+	void RemoveDuplicatesItems(bool onSelection = false);
 protected:
 	MainFrame* frame;
 	wxMenuBar* menubar;
